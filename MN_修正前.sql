@@ -4481,7 +4481,7 @@ WITH
             , t1.expected_sales_v2                                  -- DX推進室による予測モデルを引用：想定売上価値v2
             , t1.step3_pred_divided_by_mean                         -- DX推進室による予測モデルを引用：獲得時点求職者価値（対セグメント平均）(代理店向けCSVファイルでの名称：CVV_AI予測モデル)
             , t1.modified_gross_expected_sales                      -- DX推進室による予測モデルを引用：想定売上価値(代理店向けCSVファイルでの名称：想定グロス売上(修正版)_AI予測モデル)
-            , t1.expected_sales_v3 -- -- DX推進室による予測モデルを引用：想定売上価値v3,20260915山崎追記
+            , t1.expected_sales_v3 -- -- DX推進室による予測モデルを引用：想定売上価値v3,20260916山崎追記
         FROM `tryt-bigquery-pj.marketing_edit_v2.01_06_02_before_daily_share` AS t1
         LEFT JOIN `tryt-bigquery-pj.marketing_edit_v2.01_00_career_account_job_seeker_temp_field` AS t2
             ON t1.cd__c = t2.cd__c
@@ -4510,13 +4510,15 @@ WITH
         )
     
     , define_work_style_field AS ( -- work_style_mstから常勤/非常勤判定用のフラグ作成, コア層の判定フラグ作成 【重要】25年5月現在におけるコア層の定義は右記ファイルに纏められているが今後変更の可能性があるため現場担当者と擦り合わせること https://trytgroup.sharepoint.com/:x:/r/sites/marketing/_layouts/15/Doc.aspx?sourcedoc=%7B5FB0D1D8-00CB-49A3-BB5D-F18D7EB0A974%7D&file=%E3%82%B3%E3%82%A2%E5%B1%A4%20%E5%AE%9A%E7%BE%A9%E6%A4%9C%E8%A8%8E%E7%94%A8_240710.xlsx&action=default&mobileredirect=true
-        SELECT 
+ SELECT 
             b1.*
             ,CASE
                 WHEN b1.occupation = '介護職' THEN
                     CASE
                         WHEN 
                             timing IN ('1か月以内', '3か月以内')
+                            AND yuusensikakusyuukeiyou__c IN ('介護支援専門員','ヘルパー２級','介護職員実務者研修','介護職員初任者研修','介護福祉士') AND yuusensikakusyuukeiyou__c IS NOT NULL --主要5資格の追加,20260916山崎追記
+                            AND (s1.work_style IN('常勤','常勤(正社員)','常勤(日勤のみ)','常勤(日勤常勤)','常勤(夜勤可能)','常勤夜勤あり','常勤夜勤のみ','正社員','日勤常勤','夜勤常勤','常勤(夜勤あり)')) -- 常勤に該当する項目の追加,20260916山崎追記
                             THEN 1 -- 介護 コア層用フラグ
                         ELSE 0
                     END
@@ -4533,20 +4535,49 @@ WITH
                             THEN 1 -- 看護 コア層用フラグ
                         ELSE 0
                     END
-                WHEN occupation = '保育士' THEN
-                    CASE
-                        WHEN 
-                            timing IN ('1か月以内', '3か月以内', '2026年4月')  ----- 20250714変更: 注意;"2027年4月"がコア層の定義になる際は手動変更する必要あり
-                            AND yuusensikakusyuukeiyou__c NOT IN ('資格なし', 'その他', '資格取得見込み', '資格なし（職種経験無）', '資格なし（職種経験有）') AND yuusensikakusyuukeiyou__c IS NOT NULL
+                 WHEN occupation = '保育士' THEN
+                    CASE 
+                        WHEN timing IN ('1か月以内', '3か月以内')
+                            AND FORMAT_DATE('%m-%d', contact_month) BETWEEN '04-01' AND '09-01' 
+                            AND yuusensikakusyuukeiyou__c IN ('保育士', '幼稚園教諭', 'その他') AND yuusensikakusyuukeiyou__c IS NOT NULL
                             AND (s1.work_style IS NOT NULL AND s1.full_time = 1)
-                            THEN 1 --保育 コア層用フラグ
+                            THEN 1
+                    --202507以前のコア条件
+                        WHEN
+                            timing IN ('1か月以内', '3か月以内','6か月以内') 
+                            AND contact_month < DATE '2025-08-01'
+                            AND FORMAT_DATE('%m-%d', contact_month) BETWEEN '10-01' AND '12-01' 
+                            AND yuusensikakusyuukeiyou__c IN ('保育士', '幼稚園教諭', 'その他') AND yuusensikakusyuukeiyou__c IS NOT NULL
+                            AND (s1.work_style IS NOT NULL AND s1.full_time = 1)
+                            THEN 1
+                        WHEN timing IN ('1か月以内', '3か月以内')
+                            AND contact_month < DATE '2025-08-01'
+                            AND FORMAT_DATE('%m-%d', contact_month) BETWEEN '01-01' AND '03-01'
+                            AND yuusensikakusyuukeiyou__c IN ('保育士', '幼稚園教諭', 'その他') AND yuusensikakusyuukeiyou__c IS NOT NULL
+                            AND (s1.work_style IS NOT NULL AND (s1.full_time = 1 OR s1.full_time = 0))
+                            THEN 1
+                    --202508以降のコア条件    
+                        WHEN
+                            timing IN ('1か月以内', '3か月以内','6か月以内','2026年4月')  ----- 20250714変更: 注意;"2027年4月"がコア層の定義になる際は手動変更する必要あり
+                            AND contact_month >= DATE '2025-08-01'
+                            AND FORMAT_DATE('%m-%d', contact_month) BETWEEN '10-01' AND '12-01' 
+                            AND yuusensikakusyuukeiyou__c IN ('保育士', '幼稚園教諭', 'その他') AND yuusensikakusyuukeiyou__c IS NOT NULL
+                            AND (s1.work_style IS NOT NULL AND s1.full_time = 1)
+                            THEN 1
+                        WHEN timing IN ('1か月以内', '3か月以内', '2026年4月')
+                            AND contact_month >= DATE '2025-08-01'
+                            AND FORMAT_DATE('%m-%d', contact_month) BETWEEN '01-01' AND '03-01'
+                            AND yuusensikakusyuukeiyou__c IN ('保育士', '幼稚園教諭', 'その他') AND yuusensikakusyuukeiyou__c IS NOT NULL
+                            AND (s1.work_style IS NOT NULL AND (s1.full_time = 1 OR s1.full_time = 0))
+                            THEN 1
+                          --保育 コア層用フラグ,20260916山崎追記
                         ELSE 0
                     END
                 WHEN occupation = 'POS' THEN
                     CASE
                         WHEN 
                             timing IN ('1か月以内', '3か月以内', '6か月以内') 
-                            AND yuusensikakusyuukeiyou__c IN ('理学療法士', '作業療法士', '言語聴覚士', '柔道整復師') AND yuusensikakusyuukeiyou__c IS NOT NULL
+                            AND yuusensikakusyuukeiyou__c IN ('理学療法士', '作業療法士', '言語聴覚士') AND yuusensikakusyuukeiyou__c IS NOT NULL -- 柔道整復師を削除、20260916山崎追記
                             AND (s1.work_style IS NOT NULL AND s1.full_time = 1)
                             THEN 1 --PTOTST コア層用フラグ
                         ELSE 0
@@ -4567,13 +4598,22 @@ WITH
                             THEN 1 --デンタル コア層用フラグ
                         ELSE 0
                     END
-                WHEN occupation = '栄養士' THEN
+                  WHEN occupation = '栄養士' THEN
                     CASE
                         WHEN 
                             timing IN ('1か月以内', '3か月以内')
                             AND yuusensikakusyuukeiyou__c NOT IN ('資格なし', 'その他', '資格取得見込み', '資格なし（職種経験無）', '資格なし（職種経験有）') AND yuusensikakusyuukeiyou__c IS NOT NULL
                             AND (s1.work_style IS NOT NULL AND s1.full_time = 1)
                             THEN 1 --栄養士 コア層用フラグ
+                        ELSE 0
+                    END
+                  WHEN occupation = '調理師' THEN
+                    CASE
+                        WHEN 
+                            timing IN ('1か月以内', '3か月以内')
+                            AND yuusensikakusyuukeiyou__c IN ('調理師') AND yuusensikakusyuukeiyou__c IS NOT NULL
+                            AND (s1.work_style IN ('常勤(夜勤可能)','常勤(日勤常勤)','常勤(夜勤あり)','常勤(日勤のみ)','常勤','常勤夜勤あり','常勤(正社員)','正社員','日勤常勤','常勤夜勤のみ','夜勤常勤')) 
+                            THEN 1 --調理師 コア層用フラグの追加,20260916山崎追記
                         ELSE 0
                     END
                 ELSE 0
@@ -4587,7 +4627,7 @@ WITH
 
 --最終集計
 SELECT 
-      id,
+          id,
           cd__c,
           contact_month,
           contact_date,
@@ -4734,7 +4774,7 @@ SELECT
           reg_judge,
           work_style_classified,
           full_time_flg,
-          expected_sales_v3 -- expected_sales_v3を右端に配置するため、全カラム記入,20260915山崎追記 
+          expected_sales_v3 -- expected_sales_v3を右端に配置するため、全カラム記入,20260916山崎追記 
 FROM define_work_style_field;
 -- marketing_edit_v2.01_07_before_entrance_analysis
 
