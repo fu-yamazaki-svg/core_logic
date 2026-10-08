@@ -4516,8 +4516,7 @@ WITH
                 WHEN b1.occupation = '介護職' THEN
                     CASE
                         WHEN 
-                            timing IN ('1か月以内', '3か月以内')
-                            AND yuusensikakusyuukeiyou__c IN ('介護支援専門員','ヘルパー２級','介護職員実務者研修','介護職員初任者研修','介護福祉士') AND yuusensikakusyuukeiyou__c IS NOT NULL --主要5資格の追加,20260916山崎追記
+                            yuusensikakusyuukeiyou__c IN ('介護支援専門員','ヘルパー２級','介護職員実務者研修','介護職員初任者研修','介護福祉士') AND yuusensikakusyuukeiyou__c IS NOT NULL --主要5資格の追加,20260916山崎追記
                             AND (s1.work_style IN('常勤','常勤(正社員)','常勤(日勤のみ)','常勤(日勤常勤)','常勤(夜勤可能)','常勤夜勤あり','常勤夜勤のみ','正社員','日勤常勤','夜勤常勤','常勤(夜勤あり)')) -- 常勤に該当する項目の追加,20260916山崎追記
                             THEN 1 -- 介護 コア層用フラグ
                         ELSE 0
